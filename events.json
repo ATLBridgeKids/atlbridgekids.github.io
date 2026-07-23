@@ -10,7 +10,8 @@
     "location": "Duplicate Bridge Club of Atlanta, 1835 Savoy Dr Ste 204, Atlanta, GA 30341",
     "grades": "2nd–12th grade (some introductory experience expected)",
     "description": "A lesson followed by supervised play. For kids who already have some introductory bridge experience.",
-    "signup_url": "https://docs.google.com/forms/d/e/1FAIpQLScmKC9OQyDsrD1dz5yVeyTZYR9qzzg_LKEZuHLpGjuja3oLMA/viewform?usp=pp_url&entry.162715903=Aug+15+-+Bridge+lesson+%2B+supervised+play"
+    "signup_url": "https://docs.google.com/forms/d/e/1FAIpQLScmKC9OQyDsrD1dz5yVeyTZYR9qzzg_LKEZuHLpGjuja3oLMA/viewform?usp=pp_url&entry.162715903=Aug+15+-+Bridge+lesson+%2B+supervised+play",
+    "format": "lesson_play"
   },
   {
     "id": "evt-2026-08-23-lesson-minibridge",
@@ -23,7 +24,8 @@
     "location": "Duplicate Bridge Club of Atlanta, 1835 Savoy Dr Ste 204, Atlanta, GA 30341",
     "grades": "2nd–12th grade (some introductory experience expected)",
     "description": "A lesson followed by a duplicate mini-bridge game. For kids who already have some introductory bridge experience.",
-    "signup_url": "https://docs.google.com/forms/d/e/1FAIpQLScmKC9OQyDsrD1dz5yVeyTZYR9qzzg_LKEZuHLpGjuja3oLMA/viewform?usp=pp_url&entry.162715903=Aug+23+-+Bridge+lesson+%2B+duplicate+mini-bridge+game"
+    "signup_url": "https://docs.google.com/forms/d/e/1FAIpQLScmKC9OQyDsrD1dz5yVeyTZYR9qzzg_LKEZuHLpGjuja3oLMA/viewform?usp=pp_url&entry.162715903=Aug+23+-+Bridge+lesson+%2B+duplicate+mini-bridge+game",
+    "format": "lesson_minibridge"
   },
   {
     "id": "evt-2026-tbd-minibridge-tournament",
@@ -36,7 +38,9 @@
     "location": "",
     "grades": "Under 19",
     "description": "Open to any player under 19 who can play mini-bridge and stay focused for a two-hour session. Date to be announced.",
-    "signup_url": ""
+    "signup_url": "",
+    "format": "tournament",
+    "featured": true
   },
   {
     "id": "evt-2026-tbd-friday-lesson-play",
@@ -49,7 +53,8 @@
     "location": "Duplicate Bridge Club of Atlanta, 1835 Savoy Dr Ste 204, Atlanta, GA 30341",
     "grades": "2nd–12th grade (some introductory experience expected)",
     "description": "A lesson followed by supervised play. For kids who already have some introductory bridge experience. Friday date to be confirmed.",
-    "signup_url": ""
+    "signup_url": "",
+    "format": "lesson_play"
   },
   {
     "id": "evt-2026-07-20-firedragon",
@@ -60,12 +65,11 @@
     "start_time": "",
     "end_time": "",
     "location": "Intown Community School, 2059 Lavista Rd NE, Atlanta, GA 30329",
-    "grades": "4th–7th grade",
+    "grades": "4th–7th grade (true beginners — no bridge experience required)",
     "description": "Daily bridge instruction, one hour per day, as part of Firedragon Day Camp.",
     "signed_up": 40,
     "grade_breakdown": "Grades 6–7: 22 · Grades 4–5: 18",
-    "signup_url": "",
-    "force_status": "past"
+    "signup_url": ""
   },
   {
     "id": "evt-2026-06-01-westminster",
@@ -76,7 +80,7 @@
     "start_time": "09:00",
     "end_time": "16:00",
     "location": "The Westminster Schools",
-    "grades": "4th–7th grade",
+    "grades": "4th–7th grade (true beginners — no bridge experience required)",
     "description": "Week-long bridge day camp held in partnership with Westminster Schools.",
     "signed_up": 9,
     "signup_url": ""
