@@ -10,11 +10,11 @@ const CONFIG = {
   countsCsvUrl: "",    // Aggregate counts tab (event_id, signed_up, grade_pk, grade_k, grade_1 ... grade_12)
   signupFormUrl: "https://forms.gle/REPLACE-WITH-YOUR-SIGNUP-FORM",
   directoryFormUrl: "https://forms.gle/rcgYx6L8XjcE83sU6"
-  // Directory download links (CSV/PDF) are set directly as hrefs in directory.html, not here —
-  // see SETUP.md for how to build them safely. NEVER link to an .xlsx export of the directory
-  // spreadsheet: Google's xlsx export always includes every tab in the file, including the raw
-  // response tab with families who did NOT opt in to sharing. CSV/PDF exports scoped with a
-  // gid= parameter are safe; xlsx is not, unless the public tab lives in its own separate file.
+  // Directory download links (CSV/PDF) are set directly as hrefs in directory.html, not here.
+  // IMPORTANT: those links must point to a SEPARATE spreadsheet file containing only opted-in
+  // rows — never to the original signup/directory response spreadsheet. Google Sheets sharing
+  // is file-wide, not per-tab, so link-sharing the raw response file would expose every family,
+  // including ones who chose not to be shared. See SETUP.md for the safe way to set this up.
 };
 
 // ---------- Nav toggle (mobile hamburger) ----------
