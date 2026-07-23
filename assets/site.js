@@ -8,9 +8,13 @@
 const CONFIG = {
   eventsCsvUrl: "",    // e.g. "https://docs.google.com/spreadsheets/d/e/XXXX/pub?gid=0&single=true&output=csv"
   countsCsvUrl: "",    // Aggregate counts tab (event_id, signed_up, grade_pk, grade_k, grade_1 ... grade_12)
-  directoryCsvUrl: "", // Directory tab (only rows where share = yes)
   signupFormUrl: "https://forms.gle/REPLACE-WITH-YOUR-SIGNUP-FORM",
-  directoryFormUrl: "https://forms.gle/REPLACE-WITH-YOUR-DIRECTORY-FORM"
+  directoryFormUrl: "https://forms.gle/rcgYx6L8XjcE83sU6"
+  // Directory download links (CSV/PDF) are set directly as hrefs in directory.html, not here —
+  // see SETUP.md for how to build them safely. NEVER link to an .xlsx export of the directory
+  // spreadsheet: Google's xlsx export always includes every tab in the file, including the raw
+  // response tab with families who did NOT opt in to sharing. CSV/PDF exports scoped with a
+  // gid= parameter are safe; xlsx is not, unless the public tab lives in its own separate file.
 };
 
 // ---------- Nav toggle (mobile hamburger) ----------
@@ -423,55 +427,7 @@ async function renderEventsHome() {
   }
 }
 
-// ---------- Directory rendering ----------
-async function renderDirectory() {
-  const el = document.getElementById("directory-list");
-  if (!el) return;
-
-  let rows = null;
-  try {
-    if (CONFIG.directoryCsvUrl) rows = await fetchCsv(CONFIG.directoryCsvUrl);
-  } catch (e) { console.warn(e); }
-
-  if (!rows) {
-    try {
-      const res = await fetch("directory.json", { cache: "no-store" });
-      if (res.ok) rows = await res.json();
-    } catch (e) { /* ignore */ }
-  }
-
-  rows = (rows || []).filter(r => (r.share || "").toLowerCase() === "yes");
-
-  if (!rows.length) {
-    el.innerHTML = `<div class="empty-state">The directory is just getting started. If you'd like to be listed, use the form above.</div>`;
-    return;
-  }
-
-  const rowHtml = rows.map(r => {
-    const grade = r.graduation_year ? gradeLabel(currentGradeFromGradYear(Number(r.graduation_year))) : (r.grade || "");
-    return `
-      <tr>
-        <td data-label="Family">${r.parent_name || ""}</td>
-        <td data-label="Kid">${r.participant_name || ""}</td>
-        <td data-label="Grade">${grade}</td>
-        <td data-label="School">${r.school || ""}</td>
-        <td data-label="Contact">${r.email ? `<a href="mailto:${r.email}">${r.email}</a>` : ""}${r.phone ? `<div>${r.phone}</div>` : ""}</td>
-      </tr>
-    `;
-  }).join("");
-
-  el.innerHTML = `
-    <table class="directory-table">
-      <thead>
-        <tr><th>Family</th><th>Kid</th><th>Grade</th><th>School</th><th>Contact</th></tr>
-      </thead>
-      <tbody>${rowHtml}</tbody>
-    </table>
-  `;
-}
-
 // Auto-run based on page
 document.addEventListener("DOMContentLoaded", () => {
   renderEventsHome();
-  renderDirectory();
 });
