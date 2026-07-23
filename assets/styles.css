@@ -36,7 +36,7 @@ h1, h2, h3, .display {
   margin: 0 0 0.5em;
 }
 
-h1 { font-size: 2rem; }
+h1 { font-size: 2.3rem; }
 h2 { font-size: 1.5rem; }
 h3 { font-size: 1.15rem; }
 
@@ -175,8 +175,11 @@ a:hover { color: var(--gold-deep); }
   padding-bottom: 16px;
   margin-bottom: 24px;
 }
-.page-title h1 { font-size: 2.1rem; margin-bottom: 4px; }
+.page-title h1 { font-size: 2.6rem; margin-bottom: 4px; }
 .page-title p { color: var(--muted); margin: 0; }
+@media (min-width: 720px) {
+  .page-title h1 { font-size: 3.2rem; }
+}
 
 /* ---------- Hero (home) ---------- */
 .hero {
@@ -195,7 +198,7 @@ a:hover { color: var(--gold-deep); }
 }
 .hero .eyebrow { color: var(--gold); }
 .hero h1 {
-  font-size: 2.4rem;
+  font-size: 2.7rem;
   max-width: 20ch;
   margin-bottom: 12px;
 }
@@ -218,7 +221,7 @@ a:hover { color: var(--gold-deep); }
 }
 @media (min-width: 720px) {
   .hero { padding: 64px 20px 56px; }
-  .hero h1 { font-size: 3.2rem; }
+  .hero h1 { font-size: 3.6rem; }
   .hero-suits { font-size: 380px; right: -40px; }
 }
 
@@ -496,7 +499,7 @@ a:hover { color: var(--gold-deep); }
 .donate-btn:hover { border-color: var(--navy); color: var(--navy); }
 .donate-btn .arrow { color: var(--gold-deep); font-size: 1.2rem; }
 
-/* ---------- Resources (placeholder) ---------- */
+/* ---------- Resources ---------- */
 .resource-placeholder {
   text-align: center;
   padding: 60px 20px;
@@ -510,6 +513,31 @@ a:hover { color: var(--gold-deep); }
   color: var(--gold);
   margin-bottom: 12px;
 }
+
+.resource-list {
+  display: grid;
+  gap: 14px;
+  margin: 20px 0;
+}
+.resource-card {
+  background: #fff;
+  border: 1px solid var(--rule);
+  border-left: 4px solid var(--gold);
+  border-radius: 4px;
+  padding: 16px 18px;
+}
+.resource-card h3 { margin: 0 0 6px; font-size: 1.05rem; }
+.resource-card h3 a {
+  color: var(--navy);
+  text-decoration: none;
+}
+.resource-card h3 a:hover { color: var(--gold-deep); text-decoration: underline; }
+.resource-card h3 a::after {
+  content: " ↗";
+  font-size: 0.8rem;
+  color: var(--gold-deep);
+}
+.resource-card p { margin: 0; color: var(--ink); font-size: 0.92rem; }
 
 /* ---------- Footer ---------- */
 .site-footer {

@@ -86,9 +86,13 @@ async function fetchCsv(url) {
 }
 
 // ---------- Event helpers ----------
+function isTbd(val) {
+  return !val || /^tbd$/i.test(String(val).trim());
+}
+
 function parseEventDate(str) {
-  // Accept YYYY-MM-DD or MM/DD/YYYY
-  if (!str) return null;
+  // Accept YYYY-MM-DD or MM/DD/YYYY. Returns null for missing/TBD/unparseable.
+  if (!str || isTbd(str)) return null;
   if (/^\d{4}-\d{2}-\d{2}/.test(str)) return new Date(str + "T00:00:00");
   const m = str.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})/);
   if (m) return new Date(+m[3], +m[1]-1, +m[2]);
@@ -105,30 +109,79 @@ function formatEventDate(d) {
   };
 }
 
+function ymd(d) {
+  const pad = (n) => String(n).padStart(2, "0");
+  return `${d.getFullYear()}${pad(d.getMonth()+1)}${pad(d.getDate())}`;
+}
+
+function addDays(d, n) {
+  const r = new Date(d);
+  r.setDate(r.getDate() + n);
+  return r;
+}
+
+// Badge + label info for a single date or a date range. Handles TBD dates.
+function formatDateRange(dateStr, dateEndStr) {
+  const start = parseEventDate(dateStr);
+  if (!start) {
+    return { badgeTop: "", badgeMain: "Date TBD", full: "Date to be announced", tbd: true, isRange: false };
+  }
+  const end = dateEndStr ? parseEventDate(dateEndStr) : null;
+  if (!end || end.getTime() === start.getTime()) {
+    const dt = formatEventDate(start);
+    return { badgeTop: dt.day, badgeMain: dt.date, full: dt.full, tbd: false, isRange: false, start, end: start };
+  }
+  const sameMonth = start.getMonth() === end.getMonth() && start.getFullYear() === end.getFullYear();
+  const startLabel = start.toLocaleDateString(undefined, { month: "short", day: "numeric" });
+  const endLabel = sameMonth
+    ? end.toLocaleDateString(undefined, { day: "numeric" })
+    : end.toLocaleDateString(undefined, { month: "short", day: "numeric" });
+  const days = Math.round((end - start) / 86400000) + 1;
+  const full = `${start.toLocaleDateString(undefined, { month: "long", day: "numeric" })}–${end.toLocaleDateString(undefined, { month: "long", day: "numeric" })}, ${end.getFullYear()}`;
+  return { badgeTop: `${days}-day`, badgeMain: `${startLabel}–${endLabel}`, full, tbd: false, isRange: true, start, end };
+}
+
 function icsDate(d) {
   const pad = (n) => String(n).padStart(2, "0");
   return `${d.getUTCFullYear()}${pad(d.getUTCMonth()+1)}${pad(d.getUTCDate())}T${pad(d.getUTCHours())}${pad(d.getUTCMinutes())}00Z`;
 }
 
 function buildEventDateTimes(ev) {
-  // ev.date (YYYY-MM-DD), ev.start_time (HH:MM 24h), ev.end_time (HH:MM 24h) — all local
-  const d = parseEventDate(ev.date);
-  if (!d) return null;
-  const [sh, sm] = (ev.start_time || "09:00").split(":").map(Number);
-  const [eh, em] = (ev.end_time   || "10:30").split(":").map(Number);
-  const start = new Date(d); start.setHours(sh, sm, 0, 0);
-  const end   = new Date(d); end.setHours(eh, em, 0, 0);
-  return { start, end };
+  // Returns null if the date itself isn't set yet.
+  // Returns { allDay: true, start, end } if date is known but time isn't.
+  // Returns { allDay: false, start, end } with real Date/time objects otherwise.
+  const start = parseEventDate(ev.date);
+  if (!start) return null;
+  const end = ev.date_end ? (parseEventDate(ev.date_end) || start) : start;
+
+  if (isTbd(ev.start_time)) {
+    return { allDay: true, start, end };
+  }
+
+  const [sh, sm] = ev.start_time.split(":").map(Number);
+  let eh, em;
+  if (!isTbd(ev.end_time)) {
+    [eh, em] = ev.end_time.split(":").map(Number);
+  } else {
+    eh = sh + 1; em = sm; // default 1hr duration if only end time is unset
+  }
+  const startDt = new Date(start); startDt.setHours(sh, sm, 0, 0);
+  const endDt = new Date(end); endDt.setHours(eh, em, 0, 0);
+  return { allDay: false, start: startDt, end: endDt };
 }
 
 function googleCalUrl(ev) {
   const t = buildEventDateTimes(ev);
   if (!t) return "#";
+  const datesParam = t.allDay
+    ? `${ymd(t.start)}/${ymd(addDays(t.end, 1))}`
+    : `${icsDate(t.start)}/${icsDate(t.end)}`;
+  const timeNote = t.allDay ? "\n\nExact time TBD — check this page closer to the date." : "";
   const params = new URLSearchParams({
     action: "TEMPLATE",
     text: ev.title || "Atlanta Bridge Kids event",
-    dates: `${icsDate(t.start)}/${icsDate(t.end)}`,
-    details: (ev.description || "") + (ev.signup_url ? `\n\nSign up: ${ev.signup_url}` : ""),
+    dates: datesParam,
+    details: (ev.description || "") + timeNote + (ev.signup_url ? `\n\nSign up: ${ev.signup_url}` : ""),
     location: ev.location || ""
   });
   return `https://calendar.google.com/calendar/render?${params.toString()}`;
@@ -138,6 +191,10 @@ function icsString(ev) {
   const t = buildEventDateTimes(ev);
   if (!t) return "";
   const esc = (s) => String(s || "").replace(/([,;\\])/g, "\\$1").replace(/\n/g, "\\n");
+  const desc = (ev.description || "") + (t.allDay ? " Exact time TBD." : "");
+  const dtLines = t.allDay
+    ? [`DTSTART;VALUE=DATE:${ymd(t.start)}`, `DTEND;VALUE=DATE:${ymd(addDays(t.end, 1))}`]
+    : [`DTSTART:${icsDate(t.start)}`, `DTEND:${icsDate(t.end)}`];
   return [
     "BEGIN:VCALENDAR",
     "VERSION:2.0",
@@ -145,10 +202,9 @@ function icsString(ev) {
     "BEGIN:VEVENT",
     `UID:${(ev.id || Date.now())}@atlbridgekids.github.io`,
     `DTSTAMP:${icsDate(new Date())}`,
-    `DTSTART:${icsDate(t.start)}`,
-    `DTEND:${icsDate(t.end)}`,
+    ...dtLines,
     `SUMMARY:${esc(ev.title)}`,
-    `DESCRIPTION:${esc(ev.description)}`,
+    `DESCRIPTION:${esc(desc)}`,
     `LOCATION:${esc(ev.location)}`,
     "END:VEVENT",
     "END:VCALENDAR"
@@ -215,16 +271,25 @@ async function loadEvents() {
 
 // ---------- Rendering ----------
 function eventCard(ev, { past = false } = {}) {
-  const d = parseEventDate(ev.date);
-  const dt = d ? formatEventDate(d) : { day: "TBD", date: "", full: ev.date || "" };
+  const dr = formatDateRange(ev.date, ev.date_end);
   const type = (ev.type || "lesson").toLowerCase();
   const signupUrl = ev.signup_url || CONFIG.signupFormUrl;
 
-  const gradeChips = ev.grade_counts && Object.keys(ev.grade_counts).length
-    ? Object.entries(ev.grade_counts)
-        .sort((a,b) => (a[0]==="k"?-1: b[0]==="k"?1: Number(a[0]) - Number(b[0])))
-        .map(([g, n]) => `${g === "k" ? "K" : g}: ${n}`).join(" · ")
-    : "";
+  let timeText = "";
+  if (!isTbd(ev.start_time)) {
+    timeText = `⏰ ${ev.start_time}${!isTbd(ev.end_time) ? "–" + ev.end_time : ""}`;
+  } else if (ev.start_time) {
+    // explicitly marked "TBD"
+    timeText = "⏰ Time TBD";
+  }
+
+  const gradeChips = ev.grade_breakdown
+    ? ev.grade_breakdown
+    : (ev.grade_counts && Object.keys(ev.grade_counts).length
+        ? Object.entries(ev.grade_counts)
+            .sort((a,b) => (a[0]==="k"?-1: b[0]==="k"?1: Number(a[0]) - Number(b[0])))
+            .map(([g, n]) => `${g === "k" ? "K" : g}: ${n}`).join(" · ")
+        : "");
 
   const countsBlock = (ev.signed_up != null)
     ? `<div class="event-counts">
@@ -233,25 +298,33 @@ function eventCard(ev, { past = false } = {}) {
        </div>`
     : "";
 
-  const actions = past ? "" : `
-    <div class="event-actions">
-      <a class="btn btn-primary btn-small" href="${signupUrl}" target="_blank" rel="noopener">Sign up</a>
-      <a class="btn btn-ghost btn-small" href="${googleCalUrl(ev)}" target="_blank" rel="noopener">Add to Google Calendar</a>
-      <button class="btn btn-ghost btn-small" data-ics='${JSON.stringify(ev).replace(/'/g, "&apos;")}'>Download .ics</button>
-    </div>`;
+  let actions = "";
+  if (!past) {
+    const signupBtn = `<a class="btn btn-primary btn-small" href="${signupUrl}" target="_blank" rel="noopener">Sign up</a>`;
+    if (dr.tbd) {
+      actions = `<div class="event-actions">${signupBtn}<span class="disclaimer-inline" style="margin:0; padding:8px 10px;">Calendar link available once the date is set</span></div>`;
+    } else {
+      actions = `
+        <div class="event-actions">
+          ${signupBtn}
+          <a class="btn btn-ghost btn-small" href="${googleCalUrl(ev)}" target="_blank" rel="noopener">Add to Google Calendar</a>
+          <button class="btn btn-ghost btn-small" data-ics='${JSON.stringify(ev).replace(/'/g, "&apos;")}'>Download .ics</button>
+        </div>`;
+    }
+  }
 
   return `
     <article class="event-card ${past ? "past" : ""}">
       <div class="event-head">
         <div class="event-date">
-          <span class="day">${dt.day}</span>
-          ${dt.date}
+          ${dr.badgeTop ? `<span class="day">${dr.badgeTop}</span>` : ""}
+          ${dr.badgeMain}
         </div>
         <span class="event-type ${type}">${ev.type || "Lesson"}</span>
       </div>
       <h3 class="event-title">${ev.title || "Untitled event"}</h3>
       <div class="event-meta">
-        ${ev.start_time ? `<span>⏰ ${ev.start_time}${ev.end_time ? "–" + ev.end_time : ""}</span>` : ""}
+        ${timeText ? `<span>${timeText}</span>` : ""}
         ${ev.location ? `<span>📍 ${ev.location}</span>` : ""}
         ${ev.grades ? `<span>🎓 ${ev.grades}</span>` : ""}
       </div>
@@ -283,28 +356,38 @@ async function renderEventsHome() {
     const events = await loadEvents();
     const now = new Date(); now.setHours(0,0,0,0);
 
-    const upcoming = events
-      .map(e => ({ e, d: parseEventDate(e.date) }))
-      .filter(x => x.d && x.d >= now)
-      .sort((a,b) => a.d - b.d)
+    // "Relevant end date" decides past vs. upcoming: an event is only past once it's over.
+    // Events with no parseable date (TBD) are always treated as upcoming.
+    const withDates = events.map(e => {
+      const refEnd = parseEventDate(e.date_end || e.date);
+      const sortKey = parseEventDate(e.date);
+      return { e, refEnd, sortKey };
+    });
+
+    const upcoming = withDates
+      .filter(x => x.e.force_status === "upcoming" || (x.e.force_status !== "past" && (!x.refEnd || x.refEnd >= now)))
+      .sort((a, b) => {
+        const aKey = a.sortKey ? a.sortKey.getTime() : Infinity;
+        const bKey = b.sortKey ? b.sortKey.getTime() : Infinity;
+        return aKey - bKey;
+      })
       .map(x => x.e);
 
-    const past = events
-      .map(e => ({ e, d: parseEventDate(e.date) }))
-      .filter(x => x.d && x.d < now)
-      .sort((a,b) => b.d - a.d)
+    const past = withDates
+      .filter(x => x.e.force_status === "past" || (x.e.force_status !== "upcoming" && x.refEnd && x.refEnd < now))
+      .sort((a, b) => (b.refEnd || 0) - (a.refEnd || 0))
       .map(x => x.e);
 
-    // Next event highlight
+    // Next event highlight — only ever a dated event, never a TBD one
     if (nextEl) {
-      if (upcoming.length) {
-        const ev = upcoming[0];
-        const d = parseEventDate(ev.date);
-        const dt = formatEventDate(d);
+      const ev = upcoming.find(e => parseEventDate(e.date));
+      if (ev) {
+        const dr = formatDateRange(ev.date, ev.date_end);
+        const timeBit = !isTbd(ev.start_time) ? " · " + ev.start_time : "";
         nextEl.innerHTML = `
           <div class="eyebrow">Next up</div>
           <h2>${ev.title}</h2>
-          <div class="meta">${dt.full}${ev.start_time ? " · " + ev.start_time : ""}${ev.location ? " · " + ev.location : ""}</div>
+          <div class="meta">${dr.full}${timeBit}${ev.location ? " · " + ev.location : ""}</div>
           <div class="actions">
             <a class="btn btn-primary" href="${ev.signup_url || CONFIG.signupFormUrl}" target="_blank" rel="noopener">Sign up</a>
             <a class="btn btn-outline" href="${googleCalUrl(ev)}" target="_blank" rel="noopener">Add to calendar</a>
