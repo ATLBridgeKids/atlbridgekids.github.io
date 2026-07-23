@@ -1,0 +1,83 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Atlanta Bridge Kids — Youth bridge in Atlanta</title>
+<meta name="description" content="Games, lessons, camps, and supervised play for kids learning bridge in Atlanta.">
+<link rel="icon" href="assets/favicon.svg" type="image/svg+xml">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="assets/styles.css">
+</head>
+<body>
+
+<header class="site-header">
+  <div class="header-inner">
+    <a href="index.html" class="brand">
+      <span class="brand-mark">♠<span class="heart">♥</span></span>
+      <span>Atlanta Bridge Kids</span>
+    </a>
+    <button class="nav-toggle" aria-expanded="false" aria-controls="primary-nav" aria-label="Menu">
+      <span></span>
+    </button>
+  </div>
+  <nav class="site-nav" id="primary-nav" aria-label="Primary">
+    <ul>
+      <li><a href="index.html" aria-current="page">Events</a></li>
+      <li><a href="directory.html">Directory</a></li>
+      <li><a href="learn.html">Learning</a></li>
+      <li><a href="about.html">About</a></li>
+      <li><a href="disclaimer.html">Privacy</a></li>
+      <li><a href="donate.html">Donate</a></li>
+    </ul>
+  </nav>
+</header>
+
+<section class="hero">
+  <div class="hero-suits" aria-hidden="true">♠♥♦♣</div>
+  <div class="hero-inner">
+    <div class="eyebrow">Youth bridge · Atlanta</div>
+    <h1>Where kids in Atlanta learn to play bridge.</h1>
+    <p>Games, lessons, camps, and supervised play — organized in one place so families can find what's next, sign up, and stay in the loop.</p>
+  </div>
+</section>
+
+<main class="wrap">
+
+  <div class="next-event" id="next-event" hidden></div>
+
+  <div class="section-head">
+    <h2>Upcoming</h2>
+    <span class="count" id="upcoming-count"></span>
+  </div>
+  <div class="events-list" id="upcoming-events">
+    <div class="loading">Loading events…</div>
+  </div>
+
+  <div class="disclaimer-inline">
+    <strong>Heads up:</strong> When you sign up for an event, your contact info is kept private and used only by the instructor to coordinate that event. It is never posted publicly. See <a href="disclaimer.html">privacy</a>.
+  </div>
+
+  <div class="section-head">
+    <h2>Past events</h2>
+    <span class="count" id="past-count"></span>
+  </div>
+  <div class="events-list" id="past-events">
+    <div class="loading">Loading…</div>
+  </div>
+
+</main>
+
+<footer class="site-footer">
+  <div class="footer-inner">
+    <div>Atlanta Bridge Kids · Run by Andre Gilbert · Life Master, teaching since 2006</div>
+    <div>Signup and contact info stay private. Only the <a href="directory.html">directory</a> shares info between opted-in families.</div>
+    <div class="credit">atlbridgekids.github.io</div>
+  </div>
+</footer>
+
+<script src="assets/site.js"></script>
+</body>
+</html>

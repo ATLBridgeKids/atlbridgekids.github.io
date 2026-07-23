@@ -1,0 +1,85 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Directory — Atlanta Bridge Kids</title>
+<meta name="description" content="Opt-in directory so kids and families playing bridge in Atlanta can connect.">
+<link rel="icon" href="assets/favicon.svg" type="image/svg+xml">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="assets/styles.css">
+</head>
+<body>
+
+<header class="site-header">
+  <div class="header-inner">
+    <a href="index.html" class="brand">
+      <span class="brand-mark">♠<span class="heart">♥</span></span>
+      <span>Atlanta Bridge Kids</span>
+    </a>
+    <button class="nav-toggle" aria-expanded="false" aria-controls="primary-nav" aria-label="Menu">
+      <span></span>
+    </button>
+  </div>
+  <nav class="site-nav" id="primary-nav" aria-label="Primary">
+    <ul>
+      <li><a href="index.html">Events</a></li>
+      <li><a href="directory.html" aria-current="page">Directory</a></li>
+      <li><a href="learn.html">Learning</a></li>
+      <li><a href="about.html">About</a></li>
+      <li><a href="disclaimer.html">Privacy</a></li>
+      <li><a href="donate.html">Donate</a></li>
+    </ul>
+  </nav>
+</header>
+
+<main class="wrap">
+
+  <div class="page-title">
+    <div class="eyebrow">Opt-in</div>
+    <h1>Family directory</h1>
+    <p>A way for kids and families playing bridge in Atlanta to find each other.</p>
+  </div>
+
+  <div class="callout">
+    <strong>This page only shows families who chose to be listed.</strong>
+    Fill out the form below and check the "share with directory" box to add your family. You can ask to be removed anytime.
+  </div>
+
+  <p>
+    <a class="btn btn-primary" id="directory-form-link" href="#" target="_blank" rel="noopener">Add my family to the directory</a>
+  </p>
+
+  <div class="disclaimer-inline">
+    <strong>What gets shared:</strong> parent name, kid's first name, grade (auto-calculated from graduation year), school, and whichever contact info you provide. Nothing else. Info from event sign-ups is never added here without an explicit opt-in.
+  </div>
+
+  <div class="section-head">
+    <h2>Families</h2>
+  </div>
+  <div id="directory-list">
+    <div class="loading">Loading…</div>
+  </div>
+
+</main>
+
+<footer class="site-footer">
+  <div class="footer-inner">
+    <div>Atlanta Bridge Kids · Run by Andre Gilbert · Life Master, teaching since 2006</div>
+    <div>Signup and contact info stay private. Only the directory shares info between opted-in families.</div>
+    <div class="credit">atlbridgekids.github.io</div>
+  </div>
+</footer>
+
+<script src="assets/site.js"></script>
+<script>
+  // Wire directory form link
+  document.addEventListener("DOMContentLoaded", () => {
+    const a = document.getElementById("directory-form-link");
+    if (a && typeof CONFIG !== "undefined") a.href = CONFIG.directoryFormUrl;
+  });
+</script>
+</body>
+</html>

@@ -1,0 +1,394 @@
+/* Atlanta Bridge Kids — shared client-side logic
+   Handles nav, grade math from graduation year, and event rendering.
+*/
+
+// ---------- CONFIG ----------
+// Replace these URLs after you publish the Google Sheet tabs to the web as CSV.
+// File → Share → Publish to web → pick tab → CSV → copy the URL here.
+const CONFIG = {
+  eventsCsvUrl: "",    // e.g. "https://docs.google.com/spreadsheets/d/e/XXXX/pub?gid=0&single=true&output=csv"
+  countsCsvUrl: "",    // Aggregate counts tab (event_id, signed_up, grade_pk, grade_k, grade_1 ... grade_12)
+  directoryCsvUrl: "", // Directory tab (only rows where share = yes)
+  signupFormUrl: "https://forms.gle/REPLACE-WITH-YOUR-SIGNUP-FORM",
+  directoryFormUrl: "https://forms.gle/REPLACE-WITH-YOUR-DIRECTORY-FORM"
+};
+
+// ---------- Nav toggle (mobile hamburger) ----------
+document.addEventListener("DOMContentLoaded", () => {
+  const toggle = document.querySelector(".nav-toggle");
+  const nav = document.querySelector(".site-nav");
+  if (toggle && nav) {
+    toggle.addEventListener("click", () => {
+      const open = nav.classList.toggle("open");
+      toggle.setAttribute("aria-expanded", open ? "true" : "false");
+    });
+  }
+});
+
+// ---------- Grade math from graduation year ----------
+// U.S. school year rolls over ~August. A student graduating in year Y is in:
+//   grade 12 during school year (Y-1)/Y
+//   grade 11 during school year (Y-2)/(Y-1)
+// School year "starts" for our purposes on Aug 1.
+function currentGradeFromGradYear(gradYear) {
+  const today = new Date();
+  const schoolYearStart = today.getMonth() >= 7 ? today.getFullYear() : today.getFullYear() - 1;
+  // If gradYear = schoolYearStart + 1 → grade 12
+  const grade = 12 - ((gradYear - 1) - schoolYearStart);
+  return grade;
+}
+
+function gradeLabel(grade) {
+  if (grade < 0) return "Pre-K";
+  if (grade === 0) return "K";
+  if (grade > 12) return "Post-grad";
+  const suffix = (n) => {
+    if (n >= 11 && n <= 13) return "th";
+    const last = n % 10;
+    return last === 1 ? "st" : last === 2 ? "nd" : last === 3 ? "rd" : "th";
+  };
+  return `${grade}${suffix(grade)}`;
+}
+
+// ---------- Tiny CSV parser (handles quoted commas + escaped quotes) ----------
+function parseCsv(text) {
+  const rows = [];
+  let row = [], cell = "", inQuotes = false;
+  for (let i = 0; i < text.length; i++) {
+    const c = text[i];
+    if (inQuotes) {
+      if (c === '"' && text[i+1] === '"') { cell += '"'; i++; }
+      else if (c === '"') { inQuotes = false; }
+      else { cell += c; }
+    } else {
+      if (c === '"') inQuotes = true;
+      else if (c === ",") { row.push(cell); cell = ""; }
+      else if (c === "\n") { row.push(cell); rows.push(row); row = []; cell = ""; }
+      else if (c === "\r") { /* skip */ }
+      else { cell += c; }
+    }
+  }
+  if (cell.length || row.length) { row.push(cell); rows.push(row); }
+  if (!rows.length) return [];
+  const headers = rows[0].map(h => h.trim());
+  return rows.slice(1).filter(r => r.some(v => v && v.trim() !== "")).map(r => {
+    const obj = {};
+    headers.forEach((h, i) => obj[h] = (r[i] ?? "").trim());
+    return obj;
+  });
+}
+
+async function fetchCsv(url) {
+  if (!url) return null;
+  const res = await fetch(url, { cache: "no-store" });
+  if (!res.ok) throw new Error(`Fetch failed: ${res.status}`);
+  return parseCsv(await res.text());
+}
+
+// ---------- Event helpers ----------
+function parseEventDate(str) {
+  // Accept YYYY-MM-DD or MM/DD/YYYY
+  if (!str) return null;
+  if (/^\d{4}-\d{2}-\d{2}/.test(str)) return new Date(str + "T00:00:00");
+  const m = str.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})/);
+  if (m) return new Date(+m[3], +m[1]-1, +m[2]);
+  const d = new Date(str);
+  return isNaN(d) ? null : d;
+}
+
+function formatEventDate(d) {
+  return {
+    day: d.toLocaleDateString(undefined, { weekday: "short" }),
+    date: d.toLocaleDateString(undefined, { month: "short", day: "numeric" }),
+    year: d.getFullYear(),
+    full: d.toLocaleDateString(undefined, { weekday: "long", month: "long", day: "numeric", year: "numeric" })
+  };
+}
+
+function icsDate(d) {
+  const pad = (n) => String(n).padStart(2, "0");
+  return `${d.getUTCFullYear()}${pad(d.getUTCMonth()+1)}${pad(d.getUTCDate())}T${pad(d.getUTCHours())}${pad(d.getUTCMinutes())}00Z`;
+}
+
+function buildEventDateTimes(ev) {
+  // ev.date (YYYY-MM-DD), ev.start_time (HH:MM 24h), ev.end_time (HH:MM 24h) — all local
+  const d = parseEventDate(ev.date);
+  if (!d) return null;
+  const [sh, sm] = (ev.start_time || "09:00").split(":").map(Number);
+  const [eh, em] = (ev.end_time   || "10:30").split(":").map(Number);
+  const start = new Date(d); start.setHours(sh, sm, 0, 0);
+  const end   = new Date(d); end.setHours(eh, em, 0, 0);
+  return { start, end };
+}
+
+function googleCalUrl(ev) {
+  const t = buildEventDateTimes(ev);
+  if (!t) return "#";
+  const params = new URLSearchParams({
+    action: "TEMPLATE",
+    text: ev.title || "Atlanta Bridge Kids event",
+    dates: `${icsDate(t.start)}/${icsDate(t.end)}`,
+    details: (ev.description || "") + (ev.signup_url ? `\n\nSign up: ${ev.signup_url}` : ""),
+    location: ev.location || ""
+  });
+  return `https://calendar.google.com/calendar/render?${params.toString()}`;
+}
+
+function icsString(ev) {
+  const t = buildEventDateTimes(ev);
+  if (!t) return "";
+  const esc = (s) => String(s || "").replace(/([,;\\])/g, "\\$1").replace(/\n/g, "\\n");
+  return [
+    "BEGIN:VCALENDAR",
+    "VERSION:2.0",
+    "PRODID:-//Atlanta Bridge Kids//EN",
+    "BEGIN:VEVENT",
+    `UID:${(ev.id || Date.now())}@atlbridgekids.github.io`,
+    `DTSTAMP:${icsDate(new Date())}`,
+    `DTSTART:${icsDate(t.start)}`,
+    `DTEND:${icsDate(t.end)}`,
+    `SUMMARY:${esc(ev.title)}`,
+    `DESCRIPTION:${esc(ev.description)}`,
+    `LOCATION:${esc(ev.location)}`,
+    "END:VEVENT",
+    "END:VCALENDAR"
+  ].join("\r\n");
+}
+
+function downloadIcs(ev) {
+  const blob = new Blob([icsString(ev)], { type: "text/calendar;charset=utf-8" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = `${(ev.title || "event").replace(/[^\w-]+/g, "_")}.ics`;
+  document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
+
+// ---------- Load & merge events + counts ----------
+async function loadEvents() {
+  // Try published Sheet first; fall back to local events.json for setup phase.
+  let events = null;
+  try {
+    if (CONFIG.eventsCsvUrl) {
+      events = await fetchCsv(CONFIG.eventsCsvUrl);
+    }
+  } catch (e) { console.warn("Events CSV fetch failed, falling back:", e); }
+
+  if (!events) {
+    try {
+      const res = await fetch("events.json", { cache: "no-store" });
+      if (res.ok) events = await res.json();
+    } catch (e) { /* ignore */ }
+  }
+  if (!events) events = [];
+
+  // Optional counts overlay
+  let counts = {};
+  try {
+    if (CONFIG.countsCsvUrl) {
+      const rows = await fetchCsv(CONFIG.countsCsvUrl);
+      if (rows) {
+        rows.forEach(r => {
+          if (r.event_id) counts[r.event_id] = r;
+        });
+      }
+    }
+  } catch (e) { console.warn("Counts CSV fetch failed:", e); }
+
+  // Attach counts to matching events
+  events.forEach(ev => {
+    const c = counts[ev.id];
+    if (c) {
+      ev.signed_up = Number(c.signed_up || 0);
+      ev.grade_counts = {};
+      Object.keys(c).forEach(k => {
+        if (k.startsWith("grade_") && c[k] && Number(c[k]) > 0) {
+          ev.grade_counts[k.replace("grade_", "")] = Number(c[k]);
+        }
+      });
+    }
+  });
+
+  return events;
+}
+
+// ---------- Rendering ----------
+function eventCard(ev, { past = false } = {}) {
+  const d = parseEventDate(ev.date);
+  const dt = d ? formatEventDate(d) : { day: "TBD", date: "", full: ev.date || "" };
+  const type = (ev.type || "lesson").toLowerCase();
+  const signupUrl = ev.signup_url || CONFIG.signupFormUrl;
+
+  const gradeChips = ev.grade_counts && Object.keys(ev.grade_counts).length
+    ? Object.entries(ev.grade_counts)
+        .sort((a,b) => (a[0]==="k"?-1: b[0]==="k"?1: Number(a[0]) - Number(b[0])))
+        .map(([g, n]) => `${g === "k" ? "K" : g}: ${n}`).join(" · ")
+    : "";
+
+  const countsBlock = (ev.signed_up != null)
+    ? `<div class="event-counts">
+         <strong>${ev.signed_up}</strong> signed up
+         ${gradeChips ? `<div class="grades">by grade — ${gradeChips}</div>` : ""}
+       </div>`
+    : "";
+
+  const actions = past ? "" : `
+    <div class="event-actions">
+      <a class="btn btn-primary btn-small" href="${signupUrl}" target="_blank" rel="noopener">Sign up</a>
+      <a class="btn btn-ghost btn-small" href="${googleCalUrl(ev)}" target="_blank" rel="noopener">Add to Google Calendar</a>
+      <button class="btn btn-ghost btn-small" data-ics='${JSON.stringify(ev).replace(/'/g, "&apos;")}'>Download .ics</button>
+    </div>`;
+
+  return `
+    <article class="event-card ${past ? "past" : ""}">
+      <div class="event-head">
+        <div class="event-date">
+          <span class="day">${dt.day}</span>
+          ${dt.date}
+        </div>
+        <span class="event-type ${type}">${ev.type || "Lesson"}</span>
+      </div>
+      <h3 class="event-title">${ev.title || "Untitled event"}</h3>
+      <div class="event-meta">
+        ${ev.start_time ? `<span>⏰ ${ev.start_time}${ev.end_time ? "–" + ev.end_time : ""}</span>` : ""}
+        ${ev.location ? `<span>📍 ${ev.location}</span>` : ""}
+        ${ev.grades ? `<span>🎓 ${ev.grades}</span>` : ""}
+      </div>
+      ${ev.description ? `<p class="event-desc">${ev.description}</p>` : ""}
+      ${countsBlock}
+      ${actions}
+    </article>
+  `;
+}
+
+function attachIcsHandlers(root) {
+  root.querySelectorAll("[data-ics]").forEach(btn => {
+    btn.addEventListener("click", () => {
+      try {
+        const ev = JSON.parse(btn.getAttribute("data-ics").replace(/&apos;/g, "'"));
+        downloadIcs(ev);
+      } catch (e) { console.error(e); }
+    });
+  });
+}
+
+async function renderEventsHome() {
+  const upcomingEl = document.getElementById("upcoming-events");
+  const pastEl = document.getElementById("past-events");
+  const nextEl = document.getElementById("next-event");
+  if (!upcomingEl && !pastEl) return;
+
+  try {
+    const events = await loadEvents();
+    const now = new Date(); now.setHours(0,0,0,0);
+
+    const upcoming = events
+      .map(e => ({ e, d: parseEventDate(e.date) }))
+      .filter(x => x.d && x.d >= now)
+      .sort((a,b) => a.d - b.d)
+      .map(x => x.e);
+
+    const past = events
+      .map(e => ({ e, d: parseEventDate(e.date) }))
+      .filter(x => x.d && x.d < now)
+      .sort((a,b) => b.d - a.d)
+      .map(x => x.e);
+
+    // Next event highlight
+    if (nextEl) {
+      if (upcoming.length) {
+        const ev = upcoming[0];
+        const d = parseEventDate(ev.date);
+        const dt = formatEventDate(d);
+        nextEl.innerHTML = `
+          <div class="eyebrow">Next up</div>
+          <h2>${ev.title}</h2>
+          <div class="meta">${dt.full}${ev.start_time ? " · " + ev.start_time : ""}${ev.location ? " · " + ev.location : ""}</div>
+          <div class="actions">
+            <a class="btn btn-primary" href="${ev.signup_url || CONFIG.signupFormUrl}" target="_blank" rel="noopener">Sign up</a>
+            <a class="btn btn-outline" href="${googleCalUrl(ev)}" target="_blank" rel="noopener">Add to calendar</a>
+          </div>
+        `;
+        nextEl.hidden = false;
+      } else {
+        nextEl.hidden = true;
+      }
+    }
+
+    if (upcomingEl) {
+      upcomingEl.innerHTML = upcoming.length
+        ? upcoming.map(ev => eventCard(ev)).join("")
+        : `<div class="empty-state">No upcoming events posted yet. Check back soon.</div>`;
+      attachIcsHandlers(upcomingEl);
+
+      const countEl = document.getElementById("upcoming-count");
+      if (countEl) countEl.textContent = upcoming.length ? `${upcoming.length} scheduled` : "";
+    }
+
+    if (pastEl) {
+      pastEl.innerHTML = past.length
+        ? past.slice(0, 10).map(ev => eventCard(ev, { past: true })).join("")
+        : `<div class="empty-state">No past events on record yet.</div>`;
+
+      const countEl = document.getElementById("past-count");
+      if (countEl) countEl.textContent = past.length ? `${past.length} total` : "";
+    }
+  } catch (e) {
+    console.error(e);
+    if (upcomingEl) upcomingEl.innerHTML = `<div class="empty-state">Couldn't load events. Please refresh.</div>`;
+  }
+}
+
+// ---------- Directory rendering ----------
+async function renderDirectory() {
+  const el = document.getElementById("directory-list");
+  if (!el) return;
+
+  let rows = null;
+  try {
+    if (CONFIG.directoryCsvUrl) rows = await fetchCsv(CONFIG.directoryCsvUrl);
+  } catch (e) { console.warn(e); }
+
+  if (!rows) {
+    try {
+      const res = await fetch("directory.json", { cache: "no-store" });
+      if (res.ok) rows = await res.json();
+    } catch (e) { /* ignore */ }
+  }
+
+  rows = (rows || []).filter(r => (r.share || "").toLowerCase() === "yes");
+
+  if (!rows.length) {
+    el.innerHTML = `<div class="empty-state">The directory is just getting started. If you'd like to be listed, use the form above.</div>`;
+    return;
+  }
+
+  const rowHtml = rows.map(r => {
+    const grade = r.graduation_year ? gradeLabel(currentGradeFromGradYear(Number(r.graduation_year))) : (r.grade || "");
+    return `
+      <tr>
+        <td data-label="Family">${r.parent_name || ""}</td>
+        <td data-label="Kid">${r.participant_name || ""}</td>
+        <td data-label="Grade">${grade}</td>
+        <td data-label="School">${r.school || ""}</td>
+        <td data-label="Contact">${r.email ? `<a href="mailto:${r.email}">${r.email}</a>` : ""}${r.phone ? `<div>${r.phone}</div>` : ""}</td>
+      </tr>
+    `;
+  }).join("");
+
+  el.innerHTML = `
+    <table class="directory-table">
+      <thead>
+        <tr><th>Family</th><th>Kid</th><th>Grade</th><th>School</th><th>Contact</th></tr>
+      </thead>
+      <tbody>${rowHtml}</tbody>
+    </table>
+  `;
+}
+
+// Auto-run based on page
+document.addEventListener("DOMContentLoaded", () => {
+  renderEventsHome();
+  renderDirectory();
+});

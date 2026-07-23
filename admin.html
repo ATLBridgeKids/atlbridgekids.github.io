@@ -1,0 +1,222 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Admin — Atlanta Bridge Kids</title>
+<meta name="robots" content="noindex,nofollow">
+<link rel="icon" href="assets/favicon.svg" type="image/svg+xml">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="assets/styles.css">
+<style>
+  .admin-tools textarea {
+    width: 100%; min-height: 180px;
+    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+    font-size: 0.85rem;
+    padding: 10px; border: 1px solid var(--rule); border-radius: 4px;
+    background: #fff;
+  }
+  .admin-tools .row { display: flex; gap: 8px; flex-wrap: wrap; margin: 12px 0; }
+  .dupe-group { border: 1px solid var(--rule); border-left: 4px solid var(--heart); padding: 12px; border-radius: 3px; margin-bottom: 12px; background: #fff; }
+  .dupe-group h4 { margin: 0 0 6px; color: var(--heart); font-size: 0.9rem; text-transform: uppercase; letter-spacing: 0.1em; }
+  .dupe-row { padding: 6px 0; border-top: 1px solid var(--rule); font-size: 0.88rem; }
+  .dupe-row:first-of-type { border-top: 0; }
+  .clean-table { width: 100%; border-collapse: collapse; font-size: 0.85rem; margin-top: 12px; }
+  .clean-table th, .clean-table td { border-bottom: 1px solid var(--rule); text-align: left; padding: 6px 8px; }
+  .clean-table th { background: var(--paper); text-transform: uppercase; font-size: 0.72rem; letter-spacing: 0.1em; color: var(--muted); }
+  .stat { display: inline-block; background: var(--paper); border: 1px solid var(--rule); padding: 6px 10px; border-radius: 3px; margin-right: 8px; font-size: 0.85rem; }
+  .stat strong { color: var(--navy); font-size: 1.1rem; }
+</style>
+</head>
+<body>
+
+<header class="site-header">
+  <div class="header-inner">
+    <a href="index.html" class="brand">
+      <span class="brand-mark">♠<span class="heart">♥</span></span>
+      <span>Atlanta Bridge Kids — Admin</span>
+    </a>
+  </div>
+</header>
+
+<main class="wrap admin-tools">
+
+  <div class="page-title">
+    <div class="eyebrow">Private tool</div>
+    <h1>Signup review</h1>
+    <p>Paste in your CSV (from the Google Sheet or download from a Form response tab), and this will flag likely duplicates and give you a cleaned version to paste back.</p>
+  </div>
+
+  <div class="callout">
+    <strong>This page is not linked from the public site.</strong> Only people who know the URL can find it. Don't share the URL with families.
+  </div>
+
+  <h2>1 · Paste CSV</h2>
+  <p>Expected columns (any order, headers required): <code>timestamp, participant_name, age, graduation_year, email, phone, parent_name, event_id, bridge_level, school, share</code>. Missing columns are OK.</p>
+  <textarea id="csv-input" placeholder="Paste CSV here, including the header row..."></textarea>
+
+  <div class="row">
+    <button class="btn btn-primary" id="analyze">Analyze</button>
+    <button class="btn btn-ghost" id="clear">Clear</button>
+  </div>
+
+  <div id="stats"></div>
+
+  <h2>2 · Possible duplicates</h2>
+  <p style="color: var(--muted); font-size: 0.9rem;">Rows grouped by matching name+email, name+phone, or same email across different names. Review each group and delete the row you don't want inside your Google Sheet.</p>
+  <div id="dupes"></div>
+
+  <h2>3 · Cleaned signup list (with computed grade)</h2>
+  <p style="color: var(--muted); font-size: 0.9rem;">Grade is auto-calculated from graduation_year using today's date. Newest row wins if a row is a clear duplicate.</p>
+  <div id="cleaned"></div>
+
+  <div class="row" style="margin-top: 20px;">
+    <button class="btn btn-primary" id="download-clean">Download cleaned CSV</button>
+    <button class="btn btn-ghost" id="download-json">Download as events.json input (JSON)</button>
+  </div>
+
+</main>
+
+<script src="assets/site.js"></script>
+<script>
+  const $ = (s) => document.querySelector(s);
+
+  function normalize(s) { return (s || "").toString().trim().toLowerCase(); }
+  function nameKey(s) { return normalize(s).replace(/[^a-z\s]/g, "").replace(/\s+/g, " "); }
+  function phoneKey(s) { return (s || "").replace(/\D/g, "").slice(-10); }
+
+  function analyze(rows) {
+    // Group by potential-duplicate signatures
+    const groups = {};
+    rows.forEach((r, idx) => {
+      const nk = nameKey(r.participant_name);
+      const ek = normalize(r.email);
+      const pk = phoneKey(r.phone);
+      const sigs = [];
+      if (nk && ek) sigs.push("ne:" + nk + "|" + ek);
+      if (nk && pk) sigs.push("np:" + nk + "|" + pk);
+      if (ek) sigs.push("e:" + ek);
+      sigs.forEach(sig => {
+        (groups[sig] = groups[sig] || []).push(idx);
+      });
+    });
+
+    // Deduplicate group memberships and keep only groups with 2+ distinct rows
+    const seen = new Set();
+    const dupeGroups = [];
+    Object.entries(groups).forEach(([sig, idxs]) => {
+      const unique = [...new Set(idxs)];
+      if (unique.length < 2) return;
+      const key = unique.slice().sort().join(",");
+      if (seen.has(key)) return;
+      seen.add(key);
+      dupeGroups.push({ sig, idxs: unique });
+    });
+
+    // Build "kept" list: for each dupe group, keep the row with the latest timestamp (or last-seen)
+    const drop = new Set();
+    dupeGroups.forEach(g => {
+      let bestIdx = g.idxs[0];
+      let bestTime = -Infinity;
+      g.idxs.forEach(i => {
+        const t = Date.parse(rows[i].timestamp) || i; // fall back to index order
+        if (t > bestTime) { bestTime = t; bestIdx = i; }
+      });
+      g.idxs.forEach(i => { if (i !== bestIdx) drop.add(i); });
+    });
+
+    const cleaned = rows.filter((_, i) => !drop.has(i)).map(r => {
+      const gy = Number(r.graduation_year);
+      const grade = gy ? gradeLabel(currentGradeFromGradYear(gy)) : "";
+      return { ...r, current_grade: grade };
+    });
+
+    return { dupeGroups, cleaned, dropCount: drop.size };
+  }
+
+  function renderDupes(groups, rows) {
+    const el = $("#dupes");
+    if (!groups.length) { el.innerHTML = `<div class="empty-state">No likely duplicates found.</div>`; return; }
+    el.innerHTML = groups.map(g => `
+      <div class="dupe-group">
+        <h4>Possible duplicate (${g.idxs.length} rows)</h4>
+        ${g.idxs.map(i => {
+          const r = rows[i];
+          return `<div class="dupe-row"><strong>${r.participant_name || "?"}</strong> · ${r.email || "no email"} · ${r.phone || "no phone"} · ${r.timestamp || ""}</div>`;
+        }).join("")}
+      </div>
+    `).join("");
+  }
+
+  function renderCleaned(rows) {
+    const el = $("#cleaned");
+    if (!rows.length) { el.innerHTML = `<div class="empty-state">No rows.</div>`; return; }
+    const cols = ["timestamp","participant_name","age","current_grade","graduation_year","email","phone","parent_name","event_id","bridge_level","school","share"];
+    el.innerHTML = `
+      <table class="clean-table">
+        <thead><tr>${cols.map(c => `<th>${c}</th>`).join("")}</tr></thead>
+        <tbody>
+          ${rows.map(r => `<tr>${cols.map(c => `<td>${(r[c] ?? "").toString().replace(/</g,"&lt;")}</td>`).join("")}</tr>`).join("")}
+        </tbody>
+      </table>
+    `;
+  }
+
+  function toCsv(rows) {
+    if (!rows.length) return "";
+    const cols = Object.keys(rows[0]);
+    const esc = (v) => {
+      const s = (v ?? "").toString();
+      return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
+    };
+    return [cols.join(","), ...rows.map(r => cols.map(c => esc(r[c])).join(","))].join("\n");
+  }
+
+  let lastCleaned = [];
+
+  $("#analyze").addEventListener("click", () => {
+    const text = $("#csv-input").value.trim();
+    if (!text) return;
+    const rows = parseCsv(text);
+    const { dupeGroups, cleaned, dropCount } = analyze(rows);
+    lastCleaned = cleaned;
+    $("#stats").innerHTML = `
+      <span class="stat"><strong>${rows.length}</strong> rows in</span>
+      <span class="stat"><strong>${dupeGroups.length}</strong> duplicate groups</span>
+      <span class="stat"><strong>${dropCount}</strong> auto-dropped</span>
+      <span class="stat"><strong>${cleaned.length}</strong> rows out</span>
+    `;
+    renderDupes(dupeGroups, rows);
+    renderCleaned(cleaned);
+  });
+
+  $("#clear").addEventListener("click", () => {
+    $("#csv-input").value = "";
+    $("#stats").innerHTML = "";
+    $("#dupes").innerHTML = "";
+    $("#cleaned").innerHTML = "";
+    lastCleaned = [];
+  });
+
+  function download(name, content, type) {
+    const blob = new Blob([content], { type });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url; a.download = name;
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+  }
+
+  $("#download-clean").addEventListener("click", () => {
+    if (!lastCleaned.length) return;
+    download("signups-cleaned.csv", toCsv(lastCleaned), "text/csv");
+  });
+  $("#download-json").addEventListener("click", () => {
+    if (!lastCleaned.length) return;
+    download("signups-cleaned.json", JSON.stringify(lastCleaned, null, 2), "application/json");
+  });
+</script>
+</body>
+</html>

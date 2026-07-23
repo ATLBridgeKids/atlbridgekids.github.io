@@ -1,0 +1,38 @@
+[
+  {
+    "id": "evt-2026-09-05-firedragon",
+    "title": "Labor Day Youth Bridge Session",
+    "type": "Supervised play",
+    "date": "2026-09-05",
+    "start_time": "13:00",
+    "end_time": "16:00",
+    "location": "Duplicate Bridge Club of Atlanta",
+    "grades": "3rd–12th grade welcome",
+    "description": "Youth-only supervised play alongside the Labor Day weekend tournament. Bring a partner or come solo — we'll pair kids up.",
+    "signup_url": ""
+  },
+  {
+    "id": "evt-2026-09-13-sunday",
+    "title": "Sunday Youth Bridge",
+    "type": "Lesson",
+    "date": "2026-09-13",
+    "start_time": "14:00",
+    "end_time": "16:00",
+    "location": "Duplicate Bridge Club of Atlanta",
+    "grades": "All levels",
+    "description": "First of an ongoing Sunday youth series. Beginners welcome — first hour is a mini-lesson, second hour is play.",
+    "signup_url": ""
+  },
+  {
+    "id": "evt-2026-07-22-firedragon",
+    "title": "Firedragon Bridge Camp — Day 3",
+    "type": "Camp",
+    "date": "2026-07-22",
+    "start_time": "09:00",
+    "end_time": "15:00",
+    "location": "Firedragon Camp",
+    "grades": "K–8th",
+    "description": "Third day of a five-day intensive bridge camp for kids of all levels. Three age-grouped tracks.",
+    "signup_url": ""
+  }
+]
