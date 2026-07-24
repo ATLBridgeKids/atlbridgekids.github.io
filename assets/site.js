@@ -17,6 +17,34 @@ const CONFIG = {
   // including ones who chose not to be shared. See SETUP.md for the safe way to set this up.
 };
 
+// ---------- Event format explainers (used by the "How this works" popup) ----------
+const FORMATS = {
+  tournament: {
+    title: "How the Mini-Bridge Tournament works",
+    body: `
+      <p>Please arrive 15 minutes early so we can get organized and start on time.</p>
+      <p>Players may come with a partner or will be matched with one for the day.</p>
+      <p>Expect to play 12 boards over about two hours, followed by final awards.</p>
+      <p>No bidding knowledge is required for mini-bridge, but players are expected to stay on task and keep voices at a low level throughout.</p>
+    `
+  },
+  lesson_play: {
+    title: "How Bridge Lesson + Supervised Play works",
+    body: `
+      <p>Each hour starts with a 10-minute lesson on a bridge concept, with examples.</p>
+      <p>Kids then play hands specifically designed to reinforce that lesson.</p>
+      <p>This repeats with a new lesson for the second hour.</p>
+    `
+  },
+  lesson_minibridge: {
+    title: "How Bridge Lesson + Duplicate Mini-Bridge Game works",
+    body: `
+      <p>A 10-minute lesson on a bridge concept, with a worksheet, kicks things off.</p>
+      <p>That's followed by 6–10 boards of a duplicate mini-bridge game — similar to a tournament, just shorter.</p>
+    `
+  }
+};
+
 // ---------- Nav toggle (mobile hamburger) ----------
 document.addEventListener("DOMContentLoaded", () => {
   const toggle = document.querySelector(".nav-toggle");
@@ -174,6 +202,10 @@ function buildEventDateTimes(ev) {
   return { allDay: false, start: startDt, end: endDt };
 }
 
+function fullLocation(ev) {
+  return ev.address ? `${ev.location ? ev.location + ", " : ""}${ev.address}` : (ev.location || "");
+}
+
 function googleCalUrl(ev) {
   const t = buildEventDateTimes(ev);
   if (!t) return "#";
@@ -186,7 +218,7 @@ function googleCalUrl(ev) {
     text: ev.title || "Atlanta Bridge Kids event",
     dates: datesParam,
     details: (ev.description || "") + timeNote + (ev.signup_url ? `\n\nSign up: ${ev.signup_url}` : ""),
-    location: ev.location || ""
+    location: fullLocation(ev)
   });
   return `https://calendar.google.com/calendar/render?${params.toString()}`;
 }
@@ -209,7 +241,7 @@ function icsString(ev) {
     ...dtLines,
     `SUMMARY:${esc(ev.title)}`,
     `DESCRIPTION:${esc(desc)}`,
-    `LOCATION:${esc(ev.location)}`,
+    `LOCATION:${esc(fullLocation(ev))}`,
     "END:VEVENT",
     "END:VCALENDAR"
   ].join("\r\n");
@@ -274,10 +306,11 @@ async function loadEvents() {
 }
 
 // ---------- Rendering ----------
-function eventCard(ev, { past = false } = {}) {
+function eventCard(ev, { past = false, current = false } = {}) {
   const dr = formatDateRange(ev.date, ev.date_end);
   const type = (ev.type || "lesson").toLowerCase();
   const signupUrl = ev.signup_url || CONFIG.signupFormUrl;
+  const noActions = past || current;
 
   let timeText = "";
   if (!isTbd(ev.start_time)) {
@@ -302,29 +335,48 @@ function eventCard(ev, { past = false } = {}) {
        </div>`
     : "";
 
+  const hasInfo = !!(ev.description || ev.address || (ev.format && FORMATS[ev.format]));
+  const infoData = { title: ev.title, description: ev.description, location: ev.location, address: ev.address, format: ev.format };
+  const infoLink = hasInfo
+    ? `<button class="format-link" data-info='${JSON.stringify(infoData).replace(/'/g, "&apos;")}'>More info</button>`
+    : "";
+
   let actions = "";
-  if (!past) {
+  if (!noActions) {
     const signupBtn = `<a class="btn btn-primary btn-small" href="${signupUrl}" target="_blank" rel="noopener">Sign up</a>`;
     if (dr.tbd) {
-      actions = `<div class="event-actions">${signupBtn}<span class="disclaimer-inline" style="margin:0; padding:8px 10px;">Calendar link available once the date is set</span></div>`;
+      actions = `<div class="event-actions">${signupBtn}${infoLink}<span class="disclaimer-inline" style="margin:0; padding:8px 10px;">Calendar link available once the date is set</span></div>`;
     } else {
       actions = `
         <div class="event-actions">
           ${signupBtn}
           <a class="btn btn-ghost btn-small" href="${googleCalUrl(ev)}" target="_blank" rel="noopener">Add to Google Calendar</a>
           <button class="btn btn-ghost btn-small" data-ics='${JSON.stringify(ev).replace(/'/g, "&apos;")}'>Download .ics</button>
+          ${infoLink}
         </div>`;
     }
+  } else if (infoLink) {
+    actions = `<div class="event-actions">${infoLink}</div>`;
   }
 
+  const cardClasses = [
+    "event-card",
+    past ? "past" : "",
+    ev.featured ? "featured" : ""
+  ].filter(Boolean).join(" ");
+
   return `
-    <article class="event-card ${past ? "past" : ""}">
+    <article class="${cardClasses}">
       <div class="event-head">
         <div class="event-date">
           ${dr.badgeTop ? `<span class="day">${dr.badgeTop}</span>` : ""}
           ${dr.badgeMain}
         </div>
-        <span class="event-type ${type}">${ev.type || "Lesson"}</span>
+        <div class="event-tags">
+          ${current ? `<span class="live-tag">● Happening now</span>` : ""}
+          ${ev.featured ? `<span class="featured-tag">★ Don't miss</span>` : ""}
+          <span class="event-type ${type}">${ev.type || "Lesson"}</span>
+        </div>
       </div>
       <h3 class="event-title">${ev.title || "Untitled event"}</h3>
       <div class="event-meta">
@@ -332,11 +384,51 @@ function eventCard(ev, { past = false } = {}) {
         ${ev.location ? `<span>📍 ${ev.location}</span>` : ""}
         ${ev.grades ? `<span>🎓 ${ev.grades}</span>` : ""}
       </div>
-      ${ev.description ? `<p class="event-desc">${ev.description}</p>` : ""}
       ${countsBlock}
       ${actions}
     </article>
   `;
+}
+
+function openInfoModal(data) {
+  const overlay = document.getElementById("info-modal-overlay");
+  const titleEl = document.getElementById("info-modal-title");
+  const bodyEl = document.getElementById("info-modal-body");
+  if (!overlay || !titleEl || !bodyEl) return;
+
+  const parts = [];
+  if (data.description) parts.push(`<p>${data.description}</p>`);
+  if (data.address) {
+    const mapQuery = encodeURIComponent(`${data.location ? data.location + ", " : ""}${data.address}`);
+    parts.push(`<p><strong>Address:</strong> ${data.address}<br><a href="https://www.google.com/maps/search/?api=1&query=${mapQuery}" target="_blank" rel="noopener">Get directions ↗</a></p>`);
+  }
+  if (data.format && FORMATS[data.format]) {
+    parts.push(`<hr style="border:none; border-top:1px solid var(--rule); margin:14px 0;">`);
+    parts.push(`<h4 style="margin:0 0 8px; font-size:0.95rem; color:var(--navy);">${FORMATS[data.format].title.replace(/^How /, "How ")}</h4>`);
+    parts.push(FORMATS[data.format].body);
+  }
+
+  titleEl.textContent = data.title || "Event details";
+  bodyEl.innerHTML = parts.join("") || "<p>No additional details yet.</p>";
+  overlay.hidden = false;
+  document.body.style.overflow = "hidden";
+}
+
+function closeInfoModal() {
+  const overlay = document.getElementById("info-modal-overlay");
+  if (overlay) overlay.hidden = true;
+  document.body.style.overflow = "";
+}
+
+function attachInfoLinkHandlers(root) {
+  root.querySelectorAll("[data-info]").forEach(btn => {
+    btn.addEventListener("click", () => {
+      try {
+        const data = JSON.parse(btn.getAttribute("data-info").replace(/&apos;/g, "'"));
+        openInfoModal(data);
+      } catch (e) { console.error(e); }
+    });
+  });
 }
 
 function attachIcsHandlers(root) {
@@ -350,6 +442,7 @@ function attachIcsHandlers(root) {
   });
 }
 
+
 async function renderEventsHome() {
   const upcomingEl = document.getElementById("upcoming-events");
   const pastEl = document.getElementById("past-events");
@@ -360,43 +453,65 @@ async function renderEventsHome() {
     const events = await loadEvents();
     const now = new Date(); now.setHours(0,0,0,0);
 
-    // "Relevant end date" decides past vs. upcoming: an event is only past once it's over.
-    // Events with no parseable date (TBD) are always treated as upcoming.
+    // Three buckets:
+    //  - current: happening today, through the day AFTER it ends (a grace day)
+    //  - upcoming: starts in the future, or has no set date yet (TBD)
+    //  - past: fully over — the day after its grace day has come and gone
+    // A "force_status" field on an event overrides this math if ever needed.
     const withDates = events.map(e => {
-      const refEnd = parseEventDate(e.date_end || e.date);
-      const sortKey = parseEventDate(e.date);
-      return { e, refEnd, sortKey };
+      const start = parseEventDate(e.date);
+      const end = e.date_end ? (parseEventDate(e.date_end) || start) : start;
+      const graceEnd = end ? addDays(end, 1) : null; // still "current" through this day
+      let bucket;
+      if (e.force_status === "past") bucket = "past";
+      else if (e.force_status === "upcoming") bucket = "upcoming";
+      else if (start && graceEnd && start <= now && now <= graceEnd) bucket = "current";
+      else if (graceEnd && now > graceEnd) bucket = "past";
+      else bucket = "upcoming";
+      return { e, start, end, bucket };
     });
 
+    const current = withDates.filter(x => x.bucket === "current").map(x => x.e);
+
     const upcoming = withDates
-      .filter(x => x.e.force_status === "upcoming" || (x.e.force_status !== "past" && (!x.refEnd || x.refEnd >= now)))
+      .filter(x => x.bucket === "current" || x.bucket === "upcoming")
       .sort((a, b) => {
-        const aKey = a.sortKey ? a.sortKey.getTime() : Infinity;
-        const bKey = b.sortKey ? b.sortKey.getTime() : Infinity;
+        // Current events always float to the top; otherwise sort by start date (TBD dates go last).
+        if (a.bucket === "current" && b.bucket !== "current") return -1;
+        if (b.bucket === "current" && a.bucket !== "current") return 1;
+        const aKey = a.start ? a.start.getTime() : Infinity;
+        const bKey = b.start ? b.start.getTime() : Infinity;
         return aKey - bKey;
       })
       .map(x => x.e);
 
     const past = withDates
-      .filter(x => x.e.force_status === "past" || (x.e.force_status !== "upcoming" && x.refEnd && x.refEnd < now))
-      .sort((a, b) => (b.refEnd || 0) - (a.refEnd || 0))
+      .filter(x => x.bucket === "past")
+      .sort((a, b) => (b.end || 0) - (a.end || 0))
       .map(x => x.e);
 
-    // Next event highlight — only ever a dated event, never a TBD one
+    // Highlight banner — "Happening now" takes priority; otherwise "Next up" (soonest dated upcoming event)
     if (nextEl) {
-      const ev = upcoming.find(e => parseEventDate(e.date));
+      const liveEv = current[0];
+      const nextEv = withDates.find(x => x.bucket === "upcoming" && x.start)?.e;
+      const ev = liveEv || nextEv;
       if (ev) {
         const dr = formatDateRange(ev.date, ev.date_end);
         const timeBit = !isTbd(ev.start_time) ? " · " + ev.start_time : "";
+        const label = liveEv ? "Happening now" : "Next up";
+        const actionsHtml = liveEv
+          ? `<div class="actions"><a class="btn btn-outline" href="#upcoming">See details</a></div>`
+          : `<div class="actions">
+               <a class="btn btn-primary" href="${ev.signup_url || CONFIG.signupFormUrl}" target="_blank" rel="noopener">Sign up</a>
+               <a class="btn btn-outline" href="${googleCalUrl(ev)}" target="_blank" rel="noopener">Add to calendar</a>
+             </div>`;
         nextEl.innerHTML = `
-          <div class="eyebrow">Next up</div>
+          <div class="eyebrow">${label}</div>
           <h2>${ev.title}</h2>
           <div class="meta">${dr.full}${timeBit}${ev.location ? " · " + ev.location : ""}</div>
-          <div class="actions">
-            <a class="btn btn-primary" href="${ev.signup_url || CONFIG.signupFormUrl}" target="_blank" rel="noopener">Sign up</a>
-            <a class="btn btn-outline" href="${googleCalUrl(ev)}" target="_blank" rel="noopener">Add to calendar</a>
-          </div>
+          ${actionsHtml}
         `;
+        nextEl.classList.toggle("live", !!liveEv);
         nextEl.hidden = false;
       } else {
         nextEl.hidden = true;
@@ -405,9 +520,10 @@ async function renderEventsHome() {
 
     if (upcomingEl) {
       upcomingEl.innerHTML = upcoming.length
-        ? upcoming.map(ev => eventCard(ev)).join("")
+        ? upcoming.map(ev => eventCard(ev, { current: current.includes(ev) })).join("")
         : `<div class="empty-state">No upcoming events posted yet. Check back soon.</div>`;
       attachIcsHandlers(upcomingEl);
+      attachInfoLinkHandlers(upcomingEl);
 
       const countEl = document.getElementById("upcoming-count");
       if (countEl) countEl.textContent = upcoming.length ? `${upcoming.length} scheduled` : "";
@@ -417,6 +533,7 @@ async function renderEventsHome() {
       pastEl.innerHTML = past.length
         ? past.slice(0, 10).map(ev => eventCard(ev, { past: true })).join("")
         : `<div class="empty-state">No past events on record yet.</div>`;
+      attachInfoLinkHandlers(pastEl);
 
       const countEl = document.getElementById("past-count");
       if (countEl) countEl.textContent = past.length ? `${past.length} total` : "";
@@ -430,4 +547,17 @@ async function renderEventsHome() {
 // Auto-run based on page
 document.addEventListener("DOMContentLoaded", () => {
   renderEventsHome();
+
+  // Format-explainer modal: close via X button, overlay click, or Escape
+  const overlay = document.getElementById("info-modal-overlay");
+  if (overlay) {
+    const closeBtn = document.getElementById("info-modal-close");
+    if (closeBtn) closeBtn.addEventListener("click", closeInfoModal);
+    overlay.addEventListener("click", (e) => {
+      if (e.target === overlay) closeInfoModal();
+    });
+    document.addEventListener("keydown", (e) => {
+      if (e.key === "Escape" && !overlay.hidden) closeInfoModal();
+    });
+  }
 });
