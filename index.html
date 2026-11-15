@@ -10,6 +10,21 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="assets/styles.css">
+<style>
+  .tutorial-callout {
+    display: grid; gap: 6px;
+    margin: 8px 0 4px; padding: 18px 20px;
+    background: #fff; border: 1px solid var(--rule); border-left: 4px solid var(--gold);
+    border-radius: 6px; color: var(--ink); text-decoration: none;
+    transition: border-color .15s, box-shadow .15s;
+  }
+  .tutorial-callout:hover { border-color: var(--gold); box-shadow: 0 2px 10px rgba(0,0,0,.06); color: var(--ink); }
+  .tc-eyebrow { font-size: .72rem; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; color: var(--gold-deep); }
+  .tc-title { font-family: "Fraunces", serif; font-size: 1.35rem; font-weight: 600; color: var(--navy); }
+  .tc-desc { font-size: .95rem; color: var(--muted); line-height: 1.5; }
+  .tc-cta { font-weight: 600; color: var(--navy); margin-top: 2px; }
+  .tutorial-callout:hover .tc-cta { color: var(--gold-deep); }
+</style>
 </head>
 <body>
 
@@ -45,6 +60,13 @@
 </section>
 
 <main class="wrap">
+
+  <a class="tutorial-callout" href="https://dredog.github.io/BridgeQuest-mobile/" target="_blank" rel="noopener">
+    <span class="tc-eyebrow">New · Free online tutorial</span>
+    <span class="tc-title">Bridge Quest</span>
+    <span class="tc-desc">Learn and practice bridge at your own pace, on a phone or computer. Bite-size lessons with practice hands, plus a duplicate mini-bridge game where you can compare your results with other players.</span>
+    <span class="tc-cta">Start the tutorial →</span>
+  </a>
 
   <nav class="quick-nav" aria-label="Jump to section">
     <a href="#upcoming">Upcoming events</a>
