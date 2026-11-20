@@ -24,6 +24,9 @@
   .tc-desc { font-size: .95rem; color: var(--muted); line-height: 1.5; }
   .tc-cta { font-weight: 600; color: var(--navy); margin-top: 2px; }
   .tutorial-callout:hover .tc-cta { color: var(--gold-deep); }
+  .spotlight { margin: 8px 0 18px; display: grid; gap: 10px; }
+  .spotlight-label { font-size: .75rem; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; color: var(--gold-deep); }
+  .spotlight .event-card { margin: 0; }
 </style>
 </head>
 <body>
@@ -60,6 +63,8 @@
 </section>
 
 <main class="wrap">
+
+  <section class="spotlight" id="spotlight" hidden aria-label="Featured event"></section>
 
   <a class="tutorial-callout" href="https://dredog.github.io/BridgeQuest-mobile/" target="_blank" rel="noopener">
     <span class="tc-eyebrow">New · Free online tutorial</span>
