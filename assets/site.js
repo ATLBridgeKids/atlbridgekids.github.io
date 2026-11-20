@@ -306,6 +306,20 @@ async function loadEvents() {
 }
 
 // ---------- Rendering ----------
+// "14:30" -> "2:30", with am/pm added only where it changes (e.g. "10:00 am–12:30 pm", "2:30–5:00 pm")
+function to12(t) {
+  const m = String(t).match(/^(\d{1,2}):(\d{2})/);
+  if (!m) return { text: String(t), ap: "" };
+  const h = +m[1];
+  return { text: `${h % 12 || 12}:${m[2]}`, ap: h < 12 ? "am" : "pm" };
+}
+function formatTimeRange(start, end) {
+  const a = to12(start);
+  if (isTbd(end)) return `${a.text} ${a.ap}`.trim();
+  const b = to12(end);
+  return a.ap === b.ap ? `${a.text}–${b.text} ${b.ap}` : `${a.text} ${a.ap}–${b.text} ${b.ap}`;
+}
+
 function eventCard(ev, { past = false, current = false } = {}) {
   const dr = formatDateRange(ev.date, ev.date_end);
   const type = (ev.type || "lesson").toLowerCase();
@@ -314,7 +328,7 @@ function eventCard(ev, { past = false, current = false } = {}) {
 
   let timeText = "";
   if (!isTbd(ev.start_time)) {
-    timeText = `⏰ ${ev.start_time}${!isTbd(ev.end_time) ? "–" + ev.end_time : ""}`;
+    timeText = `⏰ ${formatTimeRange(ev.start_time, ev.end_time)}`;
   } else if (ev.start_time) {
     // explicitly marked "TBD"
     timeText = "⏰ Time TBD";
@@ -447,6 +461,7 @@ async function renderEventsHome() {
   const upcomingEl = document.getElementById("upcoming-events");
   const pastEl = document.getElementById("past-events");
   const nextEl = document.getElementById("next-event");
+  const spotEl = document.getElementById("spotlight");
   if (!upcomingEl && !pastEl) return;
 
   try {
@@ -490,6 +505,23 @@ async function renderEventsHome() {
       .sort((a, b) => (b.end || 0) - (a.end || 0))
       .map(x => x.e);
 
+    // Featured spotlight — upcoming dated events marked "featured": true, shown at the top of the page
+    if (spotEl) {
+      const feats = withDates
+        .filter(x => x.e.featured && x.start && (x.bucket === "upcoming" || x.bucket === "current"))
+        .sort((a, b) => a.start - b.start)
+        .map(x => x.e);
+      if (feats.length) {
+        spotEl.innerHTML = `<div class="spotlight-label">★ Featured</div>` +
+          feats.map(ev => eventCard(ev, { current: current.includes(ev) })).join("");
+        attachIcsHandlers(spotEl);
+        attachInfoLinkHandlers(spotEl);
+        spotEl.hidden = false;
+      } else {
+        spotEl.hidden = true;
+      }
+    }
+
     // Highlight banner — "Happening now" takes priority; otherwise "Next up" (soonest dated upcoming event)
     if (nextEl) {
       const liveEv = current[0];
@@ -497,7 +529,7 @@ async function renderEventsHome() {
       const ev = liveEv || nextEv;
       if (ev) {
         const dr = formatDateRange(ev.date, ev.date_end);
-        const timeBit = !isTbd(ev.start_time) ? " · " + ev.start_time : "";
+        const timeBit = !isTbd(ev.start_time) ? " · " + formatTimeRange(ev.start_time, ev.end_time) : "";
         const label = liveEv ? "Happening now" : "Next up";
         const actionsHtml = liveEv
           ? `<div class="actions"><a class="btn btn-outline" href="#upcoming">See details</a></div>`
