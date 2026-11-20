@@ -7,8 +7,8 @@
 // File → Share → Publish to web → pick tab → CSV → copy the URL here.
 const CONFIG = {
   eventsCsvUrl: "",    // e.g. "https://docs.google.com/spreadsheets/d/e/XXXX/pub?gid=0&single=true&output=csv"
-  countsCsvUrl: "",    // Aggregate counts tab (event_id, signed_up, grade_pk, grade_k, grade_1 ... grade_12)
-  signupFormUrl: "https://forms.gle/REPLACE-WITH-YOUR-SIGNUP-FORM",
+  countsCsvUrl: "https://docs.google.com/spreadsheets/d/e/2PACX-1vROGmmci142X_wp5nxN8dndD72QBvGD1YwvaJQBi9-aHmEneFfCZmKAO9b33pUdhiz_0FV9KFhny55G/pub?gid=881041499&single=true&output=csv",    // counts_public tab of the sign-ups Sheet (event_id, match, signed_up, grade_k ... grade_12)
+  signupFormUrl: "https://docs.google.com/forms/d/e/1FAIpQLScmKC9OQyDsrD1dz5yVeyTZYR9qzzg_LKEZuHLpGjuja3oLMA/viewform",
   directoryFormUrl: "https://forms.gle/rcgYx6L8XjcE83sU6"
   // Directory download links (CSV/PDF) are set directly as hrefs in directory.html, not here.
   // IMPORTANT: those links must point to a SEPARATE spreadsheet file containing only opted-in
